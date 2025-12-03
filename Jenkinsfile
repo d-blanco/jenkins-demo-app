@@ -3,53 +3,47 @@ pipeline {
     
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
-        IMAGE_NAME = "danblanco/jenkins-demo-app"
+        IMAGE_NAME = "YOUR_DOCKERHUB_USERNAME/jenkins-demo-app"
         IMAGE_TAG = "${BUILD_NUMBER}"
     }
     
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/d-blanco/jenkins-demo-app.git'
+                git branch: 'main', url: 'https://github.com/YOUR_USERNAME/jenkins-demo-app.git'
             }
         }
         
-        stage('Build Docker Image') {
+        stage('Build and Push') {
+            agent {
+                docker {
+                    image 'docker:24.0.7-dind'
+                    args '-v /var/run/docker.sock:/var/run/docker.sock'
+                }
+            }
             steps {
                 script {
+                    // Build image
                     sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
                     sh "docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest"
-                }
-            }
-        }
-        
-        stage('Login to Docker Hub') {
-            steps {
-                sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
-            }
-        }
-        
-        stage('Push to Docker Hub') {
-            steps {
-                script {
+                    
+                    // Login to Docker Hub
+                    sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
+                    
+                    // Push images
                     sh "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
                     sh "docker push ${IMAGE_NAME}:latest"
+                    
+                    // Cleanup
+                    sh "docker rmi ${IMAGE_NAME}:${IMAGE_TAG}"
+                    sh "docker rmi ${IMAGE_NAME}:latest"
+                    sh 'docker logout'
                 }
-            }
-        }
-        
-        stage('Cleanup') {
-            steps {
-                sh "docker rmi ${IMAGE_NAME}:${IMAGE_TAG}"
-                sh "docker rmi ${IMAGE_NAME}:latest"
             }
         }
     }
     
     post {
-        always {
-            sh 'docker logout'
-        }
         success {
             echo "Pipeline succeeded! Image pushed: ${IMAGE_NAME}:${IMAGE_TAG}"
         }
