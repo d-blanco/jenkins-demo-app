@@ -2,42 +2,27 @@ pipeline {
     agent any
     
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
         IMAGE_NAME = "danblanco/jenkins-demo-app"
-        IMAGE_TAG = "${BUILD_NUMBER}"
     }
     
     stages {
-        stage('Checkout') {
+        stage('Build Docker Image') {
             steps {
-                git branch: 'main', url: 'https://github.com/d-blanco/jenkins-demo-app.git'
+                script {
+                    // Use Docker Pipeline plugin to build image
+                    dockerImage = docker.build("${IMAGE_NAME}:${BUILD_NUMBER}")
+                }
             }
         }
         
-        stage('Build and Push') {
-            agent {
-                docker {
-                    image 'docker:24.0.7-dind'
-                    args '-v /var/run/docker.sock:/var/run/docker.sock'
-                }
-            }
+        stage('Push to Docker Hub') {
             steps {
                 script {
-                    // Build image
-                    sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
-                    sh "docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest"
-                    
-                    // Login to Docker Hub
-                    sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
-                    
-                    // Push images
-                    sh "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
-                    sh "docker push ${IMAGE_NAME}:latest"
-                    
-                    // Cleanup
-                    sh "docker rmi ${IMAGE_NAME}:${IMAGE_TAG}"
-                    sh "docker rmi ${IMAGE_NAME}:latest"
-                    sh 'docker logout'
+                    // Use Docker Pipeline plugin to push with credentials
+                    docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-credentials') {
+                        dockerImage.push("${BUILD_NUMBER}")
+                        dockerImage.push("latest")
+                    }
                 }
             }
         }
@@ -45,7 +30,7 @@ pipeline {
     
     post {
         success {
-            echo "Pipeline succeeded! Image pushed: ${IMAGE_NAME}:${IMAGE_TAG}"
+            echo "Pipeline succeeded! Image pushed: ${IMAGE_NAME}:${BUILD_NUMBER}"
         }
         failure {
             echo "Pipeline failed!"
