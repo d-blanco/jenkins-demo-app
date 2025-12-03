@@ -3,14 +3,14 @@ pipeline {
     
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
-        IMAGE_NAME = "YOUR_DOCKERHUB_USERNAME/jenkins-demo-app"
+        IMAGE_NAME = "danblanco/jenkins-demo-app"
         IMAGE_TAG = "${BUILD_NUMBER}"
     }
     
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/YOUR_USERNAME/jenkins-demo-app.git'
+                git branch: 'main', url: 'https://github.com/d-blanco/jenkins-demo-app.git'
             }
         }
         
